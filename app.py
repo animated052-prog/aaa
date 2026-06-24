@@ -1,3 +1,11 @@
+import sys
+try:
+    # This tricks the old pickle file into finding the metrics where they live now
+    import sklearn.metrics._dist_metrics as dm
+    sys.modules['sklearn.neighbors._dist_metrics'] = dm
+except ModuleNotFoundError:
+    pass
+    
 import streamlit as st
 import pickle
 import numpy as np
