@@ -2,15 +2,14 @@ import streamlit as st
 import pickle
 import numpy as np
 
-# 1. Page Configuration
+# 1. Page Config
 st.set_page_config(page_title="Heart Disease Predictor", layout="centered", page_icon="❤️")
-st.title("❤️ Heart Disease Risk Predictor")
-st.write("Input the patient's clinical data below to assess heart disease probability.")
+st.title("❤️ Heart Disease Risk Predictor (KNN Model)")
+st.write("Input the patient's clinical data below to get a real-time prediction.")
 
-# 2. Load the Heart Disease Model
+# 2. Load your specific KNeighborsClassifier Model
 @st.cache_resource
 def load_model():
-    # Make sure your model file is named 'model.pkl' in your GitHub repo
     with open("model.pkl", "rb") as file:
         model = pickle.load(file)
     return model
@@ -18,13 +17,15 @@ def load_model():
 try:
     model = load_model()
 except FileNotFoundError:
-    st.error("❌ 'model.pkl' not found. Please upload your model file to the repository.")
+    st.error("❌ 'model.pkl' not found! Make sure the file is named exactly 'model.pkl' and is in the same folder as this script.")
+    st.stop()
+except Exception as e:
+    st.error(f"❌ Error loading model: {e}")
     st.stop()
 
-# 3. User Inputs Form
-st.subheader("📊 Patient Information")
+# 3. Create Inputs for the 13 Features
+st.subheader("📋 Patient Clinical Metrics")
 
-# Layout columns for better presentation
 col1, col2 = st.columns(2)
 
 with col1:
@@ -33,65 +34,41 @@ with col1:
     sex_input = st.selectbox("Biological Sex", ["Female", "Male"])
     sex = 1 if sex_input == "Male" else 0
     
-    cp_input = st.selectbox("Chest Pain Type", [
-        "Typical Angina", 
-        "Atypical Angina", 
-        "Non-anginal Pain", 
-        "Asymptomatic"
-    ])
-    # Mapping to standard 0-3 values
-    cp = ["Typical Angina", "Atypical Angina", "Non-anginal Pain", "Asymptomatic"].index(cp_input)
+    cp = st.selectbox("Chest Pain Type (cp)", [0, 1, 2, 3], help="0: Typical Angina, 1: Atypical Angina, 2: Non-anginal Pain, 3: Asymptomatic")
+    trestbps = st.number_input("Resting Blood Pressure (trestbps in mm Hg)", min_value=50, max_value=250, value=120)
+    chol = st.number_input("Serum Cholesterol (chol in mg/dl)", min_value=100, max_value=600, value=200)
     
-    trestbps = st.number_input("Resting Blood Pressure (mm Hg)", min_value=50, max_value=250, value=120)
-    chol = st.number_input("Serum Cholesterol (mg/dl)", min_value=100, max_value=600, value=200)
+    fbs_input = st.selectbox("Fasting Blood Sugar > 120 mg/dl (fbs)", ["No", "Yes"])
+    fbs = 1 if fbs_input == "Yes" else 0
 
 with col2:
-    fbs_input = st.selectbox("Fasting Blood Sugar > 120 mg/dl", ["No", "Yes"])
-    fbs = 1 if fbs_input == "Yes" else 0
+    restecg = st.selectbox("Resting ECG Results (restecg)", [0, 1, 2], help="0: Normal, 1: ST-T wave abnormality, 2: Left ventricular hypertrophy")
+    thalach = st.number_input("Max Heart Rate Achieved (thalach)", min_value=60, max_value=220, value=150)
     
-    restecg = st.selectbox("Resting ECG Results", [0, 1, 2], help="0: Normal, 1: ST-T wave abnormality, 2: Left ventricular hypertrophy")
-    thalach = st.number_input("Maximum Heart Rate Achieved", min_value=60, max_value=220, value=150)
-    
-    exang_input = st.selectbox("Exercise-Induced Angina", ["No", "Yes"])
+    exang_input = st.selectbox("Exercise-Induced Angina (exang)", ["No", "Yes"])
     exang = 1 if exang_input == "Yes" else 0
     
-    oldpeak = st.number_input("ST Depression Induced by Exercise", min_value=0.0, max_value=10.0, value=0.0, step=0.1)
+    oldpeak = st.number_input("ST Depression Induced by Exercise (oldpeak)", min_value=0.0, max_value=10.0, value=0.0, step=0.1)
+    slope = st.selectbox("Slope of Peak Exercise ST Segment (slope)", [0, 1, 2])
+    ca = st.slider("Major Vessels Colored by Fluoroscopy (ca)", min_value=0, max_value=4, value=0)
+    thal = st.selectbox("Thalassemia Status (thal)", [0, 1, 2, 3])
 
-# Lower section for remaining complex metrics
-st.subheader("🔬 Advanced Clinical Metrics")
-col3, col4 = st.columns(2)
-
-with col3:
-    slope = st.selectbox("Slope of Peak Exercise ST Segment", [0, 1, 2], help="0: Upsloping, 1: Flat, 2: Downsloping")
-    ca = st.slider("Number of Major Vessels Colored by Fluoroscopy", min_value=0, max_value=4, value=0)
-
-with col4:
-    thal = st.selectbox("Thalassemia Status", [0, 1, 2, 3], help="0: Normal, 1: Fixed Defect, 2: Reversible Defect, 3: Unspecified")
-
-# 4. Processing the Data
+# 4. Prediction Logic
 st.markdown("---")
 if st.button("❤️ Run Health Assessment", use_container_width=True):
-    # Order must perfectly match the exact feature order used during your model training
+    # Constructing the exact 13-feature array required by your KNN model
     input_data = np.array([[age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang, oldpeak, slope, ca, thal]])
     
     try:
-        prediction = model.predict(input_data)
+        prediction = model.predict(input_data)[0]
+        probabilities = model.predict_proba(input_data)[0]
+        heart_disease_prob = probabilities[1] * 100
         
-        # Check if the model outputs probabilities (predict_proba) or binary predictions
-        if hasattr(model, "predict_proba"):
-            probability = model.predict_proba(input_data)[0][1] * 100
-            st.subheader(f"Analysis Result:")
-            if prediction[0] == 1:
-                st.error(f"⚠️ High Risk Detected: The model estimates a {probability:.1f}% probability of heart disease.")
-            else:
-                st.success(f"✅ Low Risk Detected: The model estimates a {probability:.1f}% probability of heart disease.")
+        st.subheader("Analysis Result:")
+        if prediction == 1:
+            st.error(f"⚠️ **High Risk:** The model predicts presence of heart disease with a confidence of {heart_disease_prob:.1f}%.")
         else:
-            # Fallback for standard binary models
-            if prediction[0] == 1:
-                st.error("⚠️ High Risk: The model predicts indicators of heart disease.")
-            else:
-                st.success("✅ Low Risk: The model predicts a healthy cardiovascular profile.")
-                
+            st.success(f"✅ **Low Risk:** The model predicts a healthy profile. Confidence of no heart disease is {probabilities[0]*100:.1f}%.")
+            
     except Exception as e:
         st.error(f"An error occurred during prediction: {e}")
-        st.info("💡 Hint: Ensure the feature order in `input_data` matches how your model was originally trained.")
