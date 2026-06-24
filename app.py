@@ -59,7 +59,7 @@ st.markdown("""
 # ==========================================
 @st.cache_resource
 def load_model():
-    """Loads the KNN pickle model from disk. Caches it for performance."""
+    """Loads the KNN pickle model from disk."""
     try:
         with open("model.pkl", "rb") as file:
             model = pickle.load(file)
@@ -67,6 +67,7 @@ def load_model():
     except FileNotFoundError:
         return None
     except Exception as e:
+        # If it fails due to a version conflict, return the error message string
         return str(e)
 
 def create_gauge_chart(probability):
